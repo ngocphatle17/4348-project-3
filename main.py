@@ -105,3 +105,11 @@ class BTreeNode:
             print(f"Inserted key {key}, value {value} into root node")
         else:
             print("Insertion failed: Node full. Splitting not implemented in this simplified version.")
+        def search(self, key):
+        root_id, _ = self.read_header()
+        node = self.read_node(root_id)
+        for i in range(node.num_keys):
+            if node.keys[i] == key:
+                print(f"Found: key={key}, value={node.values[i]}")
+                return
+        print(f"Error: key {key} not found")
