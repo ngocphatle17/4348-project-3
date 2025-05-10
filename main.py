@@ -124,3 +124,19 @@ class BTreeNode:
             for i in range(node.num_keys):
                 print(f"{node.keys[i]}: {node.values[i]}")
         self.close()
+    def extract(self, output_csv):
+        if os.path.exists(output_csv):
+            print("Error: output file already exists")
+            return
+        self.open()
+        self.file.seek(0, os.SEEK_END)
+        size = self.file.tell()
+        self.file.seek(BLOCK_SIZE)
+        with open(output_csv, 'w') as out:
+            while self.file.tell() < size:
+                data = self.file.read(BLOCK_SIZE)
+                node = BTreeNode.deserialize(data)
+                for i in range(node.num_keys):
+                    out.write(f"{node.keys[i]},{node.values[i]}\n")
+        self.close()
+        print(f"Extracted index data to {output_csv}")
