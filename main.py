@@ -140,3 +140,18 @@ class BTreeNode:
                     out.write(f"{node.keys[i]},{node.values[i]}\n")
         self.close()
         print(f"Extracted index data to {output_csv}")
+    def load_from_csv(self, csv_file):
+        if not os.path.exists(csv_file):
+            print("Error: CSV file does not exist")
+            return
+        try:
+            with open(csv_file, 'r') as f:
+                for line in f:
+                    if ',' not in line:
+                        continue
+                    key_str, val_str = line.strip().split(',')
+                    key, value = int(key_str), int(val_str)
+                    self.insert(key, value)
+            print(f"Loaded data from {csv_file}")
+        except Exception as e:
+            print(f"Error loading CSV: {e}")
