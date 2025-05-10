@@ -30,10 +30,11 @@ class BTreeNode:
     @staticmethod
     def deserialize(data):
         block_id, parent_id, num_keys = struct.unpack(NODE_HEADER_FORMAT, data[:24])
-        keys = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24:24 + MAX_KEYS * 8]))
-        values = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24 + MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8]))
-        children = list(struct.unpack(KEY_VAL_FORMAT * MAX_CHILDREN, data[24 + 2 * MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8 + MAX_CHILDREN * 8]))
+        keys = list(struct.unpack('>' + 'Q' * MAX_KEYS, data[24:24 + MAX_KEYS * 8]))
+        values = list(struct.unpack('>' + 'Q' * MAX_KEYS, data[24 + MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8]))
+        children = list(struct.unpack('>' + 'Q' * MAX_CHILDREN, data[24 + 2 * MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8 + MAX_CHILDREN * 8]))
         return BTreeNode(block_id, parent_id, num_keys, keys, values, children)
+
 
 class BTreeIndex:
     def __init__(self, filename):
