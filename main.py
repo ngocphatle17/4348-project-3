@@ -155,3 +155,40 @@ class BTreeNode:
             print(f"Loaded data from {csv_file}")
         except Exception as e:
             print(f"Error loading CSV: {e}")
+    import sys
+
+def main():
+    args = sys.argv
+    if len(args) < 3:
+        print("Usage: project3 <command> <file> [<args>...]")
+        return
+
+    command, filename = args[1], args[2]
+    btree = BTreeIndex(filename)
+
+    if command == "create":
+        btree.create()
+    elif command == "insert" and len(args) == 5:
+        key, val = int(args[3]), int(args[4])
+        btree.insert(key, val)
+    elif command == "search" and len(args) == 4:
+        key = int(args[3])
+        btree.search(key)
+    elif command == "print":
+        btree.print_all()
+    elif command == "extract" and len(args) == 4:
+        output_csv = args[3]
+        btree.extract(output_csv)
+    elif command == "load" and len(args) == 4:
+        csv_file = args[3]
+        try:
+            btree.read_header()
+        except:
+            print("Error: file is not a valid index file")
+            return
+        btree.load_from_csv(csv_file)
+    else:
+        print("Invalid command or arguments")
+
+if __name__ == '__main__':
+    main()
