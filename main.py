@@ -60,3 +60,15 @@ class BTreeNode:
         values = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24 + MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8]))
         children = list(struct.unpack(KEY_VAL_FORMAT * MAX_CHILDREN, data[24 + 2 * MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8 + MAX_CHILDREN * 8]))
         return BTreeNode(block_id, parent_id, num_keys, keys, values, children)
+    def write_node(self, node):
+        self.open()
+        self.file.seek(node.block_id * BLOCK_SIZE)
+        self.file.write(node.serialize())
+        self.close()
+
+    def read_node(self, block_id):
+        self.open()
+        self.file.seek(block_id * BLOCK_SIZE)
+        data = self.file.read(BLOCK_SIZE)
+        self.close()
+        return BTreeNode.deserialize(data)
