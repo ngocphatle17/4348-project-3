@@ -105,7 +105,7 @@ class BTreeNode:
             print(f"Inserted key {key}, value {value} into root node")
         else:
             print("Insertion failed: Node full. Splitting not implemented in this simplified version.")
-        def search(self, key):
+    def search(self, key):
         root_id, _ = self.read_header()
         node = self.read_node(root_id)
         for i in range(node.num_keys):
@@ -113,3 +113,14 @@ class BTreeNode:
                 print(f"Found: key={key}, value={node.values[i]}")
                 return
         print(f"Error: key {key} not found")
+    def print_all(self):
+        self.open()
+        self.file.seek(0, os.SEEK_END)
+        size = self.file.tell()
+        self.file.seek(BLOCK_SIZE)
+        while self.file.tell() < size:
+            data = self.file.read(BLOCK_SIZE)
+            node = BTreeNode.deserialize(data)
+            for i in range(node.num_keys):
+                print(f"{node.keys[i]}: {node.values[i]}")
+        self.close()
