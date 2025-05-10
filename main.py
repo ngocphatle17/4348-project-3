@@ -72,3 +72,9 @@ class BTreeNode:
         data = self.file.read(BLOCK_SIZE)
         self.close()
         return BTreeNode.deserialize(data)
+    def create(self):
+        if os.path.exists(self.filename):
+            print("Error: file already exists")
+            return
+        self.write_header()
+        print(f"Created index file {self.filename}")
