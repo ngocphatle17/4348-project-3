@@ -78,3 +78,30 @@ class BTreeNode:
             return
         self.write_header()
         print(f"Created index file {self.filename}")
+    def insert(self, key, value):
+        root_id, next_block_id = self.read_header()
+        if root_id == 0:
+            root = BTreeNode(next_block_id, 0, 1, [key] + [0] * (MAX_KEYS - 1), [value] + [0] * (MAX_KEYS - 1), [0] * MAX_CHILDREN)
+            self.write_node(root)
+            self.open()
+            self.file.seek(8)
+            self.file.write(struct.pack('>Q', root.block_id))
+            self.file.write(struct.pack('>Q', next_block_id + 1))
+            self.close()
+            print(f"Inserted root key {key}, value {value} into block {root.block_id}")
+            return
+        node = self.read_node(root_id)
+        if node.num_keys < MAX_KEYS:
+            idx = 0
+            while idx < node.num_keys and node.keys[idx] < key:
+                idx += 1
+            for j in range(node.num_keys, idx, -1):
+                node.keys[j] = node.keys[j - 1]
+                node.values[j] = node.values[j - 1]
+            node.keys[idx] = key
+            node.values[idx] = value
+            node.num_keys += 1
+            self.write_node(node)
+            print(f"Inserted key {key}, value {value} into root node")
+        else:
+            print("Insertion failed: Node full. Splitting not implemented in this simplified version.")
