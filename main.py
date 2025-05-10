@@ -32,3 +32,31 @@ class BTreeIndex:
             raise Exception("Invalid index file format")
         self.close()
         return root_id, next_block_id
+NODE_HEADER_FORMAT = '>QQQ'
+MAX_KEYS = 19
+MAX_CHILDREN = 20
+KEY_VAL_FORMAT = '>Q'
+
+class BTreeNode:
+    def __init__(self, block_id, parent_id, num_keys=0, keys=None, values=None, children=None):
+        self.block_id = block_id
+        self.parent_id = parent_id
+        self.num_keys = num_keys
+        self.keys = keys or [0] * MAX_KEYS
+        self.values = values or [0] * MAX_KEYS
+        self.children = children or [0] * MAX_CHILDREN
+
+    def serialize(self):
+        header = struct.pack(NODE_HEADER_FORMAT, self.block_id, self.parent_id, self.num_keys)
+        keys = struct.pack(KEY_VAL_FORMAT * MAX_KEYS, *self.keys)
+        values = struct.pack(KEY_VAL_FORMAT * MAX_KEYS, *self.values)
+        children = struct.pack(KEY_VAL_FORMAT * MAX_CHILDREN, *self.children)
+        return (header + keys + values + children).ljust(BLOCK_SIZE, b'\x00')
+
+    @staticmethod
+    def deserialize(data):
+        block_id, parent_id, num_keys = struct.unpack(NODE_HEADER_FORMAT, data[:24])
+        keys = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24:24 + MAX_KEYS * 8]))
+        values = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24 + MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8]))
+        children = list(struct.unpack(KEY_VAL_FORMAT * MAX_CHILDREN, data[24 + 2 * MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8 + MAX_CHILDREN * 8]))
+        return BTreeNode(block_id, parent_id, num_keys, keys, values, children)
