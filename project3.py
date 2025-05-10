@@ -1,9 +1,39 @@
 import os
 import struct
+import sys
 
 BLOCK_SIZE = 512
 MAGIC = b"4348PRJ3"
 HEADER_FORMAT = '>8sQQ'
+NODE_HEADER_FORMAT = '>QQQ'
+MAX_KEYS = 19
+MAX_CHILDREN = 20
+KEY_VAL_FORMAT = '>Q'
+
+class BTreeNode:
+    def __init__(self, block_id, parent_id, num_keys=0, keys=None, values=None, children=None):
+        self.block_id = block_id
+        self.parent_id = parent_id
+        self.num_keys = num_keys
+        self.keys = keys or [0] * MAX_KEYS
+        self.values = values or [0] * MAX_KEYS
+        self.children = children or [0] * MAX_CHILDREN
+
+    def serialize(self):
+        header = struct.pack(NODE_HEADER_FORMAT, self.block_id, self.parent_id, self.num_keys)
+        keys = struct.pack('>' + 'Q' * MAX_KEYS, *self.keys)
+        values = struct.pack('>' + 'Q' * MAX_KEYS, *self.values)
+        children = struct.pack('>' + 'Q' * MAX_CHILDREN, *self.children)
+
+        return (header + keys + values + children).ljust(BLOCK_SIZE, b'\x00')
+
+    @staticmethod
+    def deserialize(data):
+        block_id, parent_id, num_keys = struct.unpack(NODE_HEADER_FORMAT, data[:24])
+        keys = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24:24 + MAX_KEYS * 8]))
+        values = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24 + MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8]))
+        children = list(struct.unpack(KEY_VAL_FORMAT * MAX_CHILDREN, data[24 + 2 * MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8 + MAX_CHILDREN * 8]))
+        return BTreeNode(block_id, parent_id, num_keys, keys, values, children)
 
 class BTreeIndex:
     def __init__(self, filename):
@@ -32,34 +62,7 @@ class BTreeIndex:
             raise Exception("Invalid index file format")
         self.close()
         return root_id, next_block_id
-NODE_HEADER_FORMAT = '>QQQ'
-MAX_KEYS = 19
-MAX_CHILDREN = 20
-KEY_VAL_FORMAT = '>Q'
 
-class BTreeNode:
-    def __init__(self, block_id, parent_id, num_keys=0, keys=None, values=None, children=None):
-        self.block_id = block_id
-        self.parent_id = parent_id
-        self.num_keys = num_keys
-        self.keys = keys or [0] * MAX_KEYS
-        self.values = values or [0] * MAX_KEYS
-        self.children = children or [0] * MAX_CHILDREN
-
-    def serialize(self):
-        header = struct.pack(NODE_HEADER_FORMAT, self.block_id, self.parent_id, self.num_keys)
-        keys = struct.pack(KEY_VAL_FORMAT * MAX_KEYS, *self.keys)
-        values = struct.pack(KEY_VAL_FORMAT * MAX_KEYS, *self.values)
-        children = struct.pack(KEY_VAL_FORMAT * MAX_CHILDREN, *self.children)
-        return (header + keys + values + children).ljust(BLOCK_SIZE, b'\x00')
-
-    @staticmethod
-    def deserialize(data):
-        block_id, parent_id, num_keys = struct.unpack(NODE_HEADER_FORMAT, data[:24])
-        keys = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24:24 + MAX_KEYS * 8]))
-        values = list(struct.unpack(KEY_VAL_FORMAT * MAX_KEYS, data[24 + MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8]))
-        children = list(struct.unpack(KEY_VAL_FORMAT * MAX_CHILDREN, data[24 + 2 * MAX_KEYS * 8:24 + 2 * MAX_KEYS * 8 + MAX_CHILDREN * 8]))
-        return BTreeNode(block_id, parent_id, num_keys, keys, values, children)
     def write_node(self, node):
         self.open()
         self.file.seek(node.block_id * BLOCK_SIZE)
@@ -72,16 +75,22 @@ class BTreeNode:
         data = self.file.read(BLOCK_SIZE)
         self.close()
         return BTreeNode.deserialize(data)
+
     def create(self):
         if os.path.exists(self.filename):
             print("Error: file already exists")
             return
         self.write_header()
         print(f"Created index file {self.filename}")
+
     def insert(self, key, value):
         root_id, next_block_id = self.read_header()
         if root_id == 0:
-            root = BTreeNode(next_block_id, 0, 1, [key] + [0] * (MAX_KEYS - 1), [value] + [0] * (MAX_KEYS - 1), [0] * MAX_CHILDREN)
+            keys = [0] * MAX_KEYS
+            values = [0] * MAX_KEYS
+            keys[0] = key
+            values[0] = value
+            root = BTreeNode(next_block_id, 0, 1, keys, values, [0] * MAX_CHILDREN)
             self.write_node(root)
             self.open()
             self.file.seek(8)
@@ -90,7 +99,11 @@ class BTreeNode:
             self.close()
             print(f"Inserted root key {key}, value {value} into block {root.block_id}")
             return
+
         node = self.read_node(root_id)
+        if key in node.keys[:node.num_keys]:
+            print(f"Key {key} already exists")
+            return
         if node.num_keys < MAX_KEYS:
             idx = 0
             while idx < node.num_keys and node.keys[idx] < key:
@@ -105,6 +118,7 @@ class BTreeNode:
             print(f"Inserted key {key}, value {value} into root node")
         else:
             print("Insertion failed: Node full. Splitting not implemented in this simplified version.")
+
     def search(self, key):
         root_id, _ = self.read_header()
         node = self.read_node(root_id)
@@ -113,6 +127,7 @@ class BTreeNode:
                 print(f"Found: key={key}, value={node.values[i]}")
                 return
         print(f"Error: key {key} not found")
+
     def print_all(self):
         self.open()
         self.file.seek(0, os.SEEK_END)
@@ -124,6 +139,7 @@ class BTreeNode:
             for i in range(node.num_keys):
                 print(f"{node.keys[i]}: {node.values[i]}")
         self.close()
+
     def extract(self, output_csv):
         if os.path.exists(output_csv):
             print("Error: output file already exists")
@@ -140,6 +156,7 @@ class BTreeNode:
                     out.write(f"{node.keys[i]},{node.values[i]}\n")
         self.close()
         print(f"Extracted index data to {output_csv}")
+
     def load_from_csv(self, csv_file):
         if not os.path.exists(csv_file):
             print("Error: CSV file does not exist")
@@ -155,12 +172,11 @@ class BTreeNode:
             print(f"Loaded data from {csv_file}")
         except Exception as e:
             print(f"Error loading CSV: {e}")
-    import sys
 
 def main():
     args = sys.argv
     if len(args) < 3:
-        print("Usage: project3 <command> <file> [<args>...]")
+        print("Usage:\n  create <file>\n  insert <file> <key> <value>\n  search <file> <key>\n  print <file>\n  extract <file> <csv>\n  load <file> <csv>")
         return
 
     command, filename = args[1], args[2]
